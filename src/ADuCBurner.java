@@ -17,7 +17,7 @@ public class ADuCBurner {
     private boolean errorTimeout;
     private String filepath;
 
-    private class timerClass extends TimerTask{
+    private class timerClass extends TimerTask {
         @Override
         public void run() {
             errorTimeout = true;
@@ -29,7 +29,6 @@ public class ADuCBurner {
     public ADuCBurner(String portName, int baudRate) {
         this.accepted = 0;
         this.comPort = SerialPort.getCommPort(portName);
-        filepath = "";
         comPort.setComPortParameters(baudRate, 8, SerialPort.ONE_STOP_BIT, SerialPort.NO_PARITY);
         comPort.openPort();
 
@@ -43,7 +42,7 @@ public class ADuCBurner {
                     return;
                 byte[] newData = new byte[comPort.bytesAvailable()];
                 comPort.readBytes(newData, newData.length);
-                System.out.println("Loader:" + Arrays.toString(newData));
+                //System.out.println("Loader:" + Arrays.toString(newData));
                 accepted = newData[0];
             }
         });
@@ -52,11 +51,12 @@ public class ADuCBurner {
     public void stopBurner(){
         comPort.removeDataListener();
         comPort.closePort();
+        t.cancel();
+        t.purge();
     }
 
-    public void setPath(String filepath){
+    public void setFilepath(String filepath){
         this.filepath = filepath;
-        System.out.println("Diretorio: " + filepath);
     }
 
     public boolean sendWakeUp(){
@@ -75,6 +75,7 @@ public class ADuCBurner {
 
         if(accepted == 7){
             accepted = 0;
+            System.out.println("Device not found");
             return false;
         }else if(accepted == 6){
             accepted = 0;
@@ -86,15 +87,7 @@ public class ADuCBurner {
         byte[] changeBaudRate = {7, 14, 3, 66, -127, 45, 13};
         comPort.writeBytes(changeBaudRate, changeBaudRate.length);
         comPort.setComPortParameters(115200, 8, SerialPort.ONE_STOP_BIT, SerialPort.NO_PARITY);
-        errorTimeout = false;
-        t = new Timer();
-        errorTimeout = false;
-        t.schedule(new timerClass(), 1000);
         while (accepted == 0 && !errorTimeout) Thread.onSpinWait();
-
-        if(errorTimeout){
-            return false;
-        }
 
         if(accepted == 7){
             accepted = 0;
@@ -120,6 +113,7 @@ public class ADuCBurner {
 
         if(accepted == 7){
             accepted = 0;
+            System.out.println("Failed while errasing program memory");
             return false;
         }else if(accepted == 6){
             accepted = 0;
@@ -136,12 +130,14 @@ public class ADuCBurner {
         t.schedule(new timerClass(), 1000);
         while (accepted == 0 && !errorTimeout) Thread.onSpinWait();
 
+
         if(errorTimeout){
             return false;
         }
 
         if(accepted == 7){
             accepted = 0;
+            System.out.println("Failed while setting secure mode");
             return false;
         }else if(accepted == 6){
             accepted = 0;
@@ -158,12 +154,14 @@ public class ADuCBurner {
         t.schedule(new timerClass(), 1000);
         while (accepted == 0 && !errorTimeout) Thread.onSpinWait();
 
+
         if(errorTimeout){
             return false;
         }
 
         if(accepted == 7){
             accepted = 0;
+            System.out.println("Failed while changing boot mode");
             return false;
         }else if(accepted == 6){
             accepted = 0;
@@ -180,12 +178,14 @@ public class ADuCBurner {
         t.schedule(new timerClass(), 1000);
         while (accepted == 0 && !errorTimeout) Thread.onSpinWait();
 
+
         if(errorTimeout){
             return false;
         }
 
         if(accepted == 7){
             accepted = 0;
+            System.out.println("Failed while runing program");
             return false;
         }else if(accepted == 6){
             accepted = 0;
@@ -246,16 +246,20 @@ public class ADuCBurner {
                     progressBar[52] = '|';
                 }
                 consoleCleaner.ClearConsole();
+                System.out.println("Procurando dispositivo: Sucesso");
+                System.out.println("Aumentando o baudrate: Sucesso");
+                System.out.println("Limpando memoria de programa: Sucesso");
+                System.out.println("Transferindo programa:");
                 System.out.print(new String(progressBar));
             }
             percAnt = perc;
+
             size = Integer.parseInt(line.substring(1, 3), 16);
             addr = Integer.parseInt(line.substring(3, 7), 16);
             type = Integer.parseInt(line.substring(7, 9), 16);
             if(type == 1) {
                 break;
             }
-
             byte[] toSend = new byte[size + 8];
             toSend[0] = 0x07;
             toSend[1] = 0x0E;
@@ -267,34 +271,29 @@ public class ADuCBurner {
             for(int i = 0; i < size; i++){
                 toSend[i + 7] = (byte) Integer.parseInt(line.substring(i*2 + 9, i*2 + 11), 16);
             }
-
             int checksum = 0;
             for(int i = 2; i < toSend.length - 1; i++){
                 checksum += toSend[i];
             }
-
             checksum = (byte) (checksum & 0xFF);
             checksum = 0x100 - checksum;
             toSend[toSend.length - 1] = (byte) checksum;
             comPort.writeBytes(toSend, toSend.length);
-            errorTimeout = false;
-            t = new Timer();
-            errorTimeout = false;
-            t.schedule(new timerClass(), 1000);
-            while (accepted == 0 && !errorTimeout) Thread.onSpinWait();
-
-            if(errorTimeout){
-                return false;
-            }
+            while (accepted == 0) Thread.onSpinWait();
 
             if(accepted == 7){
                 accepted = 0;
+                System.out.println("Failed while recording program bytes");
                 return false;
             }else if(accepted == 6){
                 accepted = 0;
             }
         }
-        System.out.println("");
+        consoleCleaner.ClearConsole();
+        System.out.println("Procurando dispositivo: Sucesso");
+        System.out.println("Aumentando o baudrate: Sucesso");
+        System.out.println("Limpando memoria de programa: Sucesso");
+        System.out.println("Transferindo programa: Sucesso");
         return true;
     }
 }
